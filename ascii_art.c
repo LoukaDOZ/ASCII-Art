@@ -2,25 +2,19 @@
 #include <stdlib.h>
 #include <math.h>
 #include <string.h>
+#include <errno.h>
 
-#define MAX_LENGTH 83
+#define LENGTH 50
+#define MEMORY_ERROR "Unable to allocate needed memory\n"
+#define READ_PIXEL_ERROR "Error while reading pixel\n"
+#define BIG_CHAR_TABLE "$@B%8&WM#*oahkbdpqwmZO0QLCJUYXzcvunxrjft/\\|()1{}[]?-_+~<>i!lI;:,\"^`'. "
+#define SMALL_CHAR_TABLE "@%#*+=-:. "
 
-/**********************
- *
- * MODIFIEZ ET RENDEZ CE SEUL FICHIER COMME REPONSE
- *
- * INDIQUEZ VOTRE NOM ET PRENOM CI-DESSOUS:
- * DOZ:
- * Louka:
- *
- ********************/
+// " .:-=+*#%@"
+// "@%#*+=-:. "
 
-/* Quelques fonctions d'aide vous sont fournies. Vous pouvez les utiliser pour lire une image PPM.
- *
- * N'hésitez pas si vous rencontrez un problème avec ces fonctions
- * */
-
-
+// " .'`^\",:;Il!i><~+_-?][}{1)(|\\/tfjrxnuvczXYUJCLQ0OZmwqpdbkhao*#MW&8%B@$"
+// "$@B%8&WM#*oahkbdpqwmZO0QLCJUYXzcvunxrjft/\\|()1{}[]?-_+~<>i!lI;:,\"^`'. "
 
 /* Retourne 1 si s est un commentaire, 0 sinon */
 int is_comment(char* s) {
@@ -38,18 +32,6 @@ void read_width_height(char* s, int* pw, int* ph) {
     sscanf(s, "%d %d", pw, ph);
 }
 
-/* Renvoie un pointeur sur les 3w entiers dans s, dans le même ordre */
-int* read_pixels(char* s, int w) {
-    int* intergers = (int*) malloc(sizeof(int) * 3 * w);
-
-    for(int i = 0, j = 0; j < 3 * w; i += 4, j++) {
-        s[i + 3] = '\0';
-        intergers[j] = strtol(&s[i], NULL, 10);
-    }
-
-    return intergers;
-}
-
 /**
  * Lit et renvoie la première ligne de l'entrée standard qui n'est pas un commentaire d'un fichier PPM.
  * On suppose qu'un fichier PPM a été donné en entrée standard. 
@@ -57,14 +39,25 @@ int* read_pixels(char* s, int w) {
  *
  * La chaîne qui est renvoyée a été réservée avec malloc et peut être libérée avec free dès que son utilisation n'est plus requise.
  */
-char* read_line(){
-    char * buffer = (char *) malloc( MAX_LENGTH * sizeof(char) );
-    if(buffer == NULL)
+char* read_line(FILE* in){
+    char * buffer = (char*) malloc(LENGTH * sizeof(char));
+
+    if(buffer == NULL) {
+        fprintf(stderr, MEMORY_ERROR);
         return NULL;
+    }
+
     while(1){
-        fgets(buffer, MAX_LENGTH * sizeof(char), stdin);
+        char* res = fgets(buffer, LENGTH * sizeof(char), in);
+
+        if(res == NULL) {
+            fprintf(stderr, "Unable to read PPM line\n");
+            return NULL;
+        }
+
         if(is_comment(buffer) == 1)
             continue;
+
         return buffer;
     }
 
@@ -77,105 +70,93 @@ int isnumber(char c){
     return c >= '0' && c <= '9';
 }
 
-/**
- * Lit le premier nombre présent dans la chaîne src et l'écrit au début de dst suivi d'un espace.
- * On suppose que ce nombre existe et est un entier inférieur à 999.
- * Le nombre est écrit dans dst avec 3 chiffres. S'il est inférieur à 100 alors il
- * est complété à gauche avec des 0.
- *
- * La fonction renvoie l'indice du premier caractère suivant ce nombre qui est un chiffre ou qui est '\0'.
- */
-int copy_next_int(char* src, char* dst){
-    dst[0] = '0';
-    dst[1] = '0';
-    dst[2] = '0';
-    dst[3] = ' ';
-    
-    int start = 0;
-    while(!isnumber(src[start]))
-        start++;
-    int end = start + 1;
-    while(isnumber(src[end]))
-        end++;
+int next_int_pixel(FILE* in) {
+    char str[] = {'0', '0', '0', '\0'};
+    char c;
 
-    for(int j = start; j < end; j++)
-        dst[2 - (end - j - 1)] = src[j];
-
-    while(!isnumber(src[end]) && src[end] != '\0')
-        end++;
-    return end;
-}
-
-/**
- * Cette fonction lit l'entrée standard et renvoie une chaîne contenant les 3w premiers entiers qu'elle lit.
- * On suppose qu'un fichier PPM a été donné en entrée standard et on suppose que les premières lignes de ce fichier
- * ont été consommées de sorte que la première ligne de l'entrée standard décrit le début d'une ligne de l'image.
- * On suppose que ce fichier est bien formé : aucune ligne ne fait plus de 80 caractères et il y a un saut de 
- * ligne après le dernier pixel de chaque ligne de l'image.
- * On suppose tous ces entiers inférieurs à 999. Il sont alors écrit dans la chaîne résultat avec 3 chiffres.
- *
- * Donner en entrée standard un fichier ne respectant pas ces consignes peut provoquer une erreur de segmentation.
- *
- * Tous les entiers inférieurs à 100 sont complétés à gauche avec des 0.
- * Tous les entier sont séparés par des espaces. 
- * Toutes les lignes de l'entrée standard lues sont consommées. 
- * 
- * La chaîne qui est renvoyée a été réservée avec malloc et peut être libérée avec free dès que son utilisation n'est plus requise.
- * 
- */
-char* read_pixels_line(int w){
-    char * buffer = (char *) malloc( MAX_LENGTH * sizeof(char) );
-    if(buffer == NULL)
-        return NULL;
-    char *  pixels = (char *) malloc((12 * w + 1) * sizeof(char));
-    pixels[12 * w] = '\0';
-    if(pixels == NULL)
-        return NULL;
-    char* src;
-    char * dst = pixels;
-    int counter = 0;
-    while(counter < 3 * w){
-        fgets(buffer, MAX_LENGTH * sizeof(char), stdin);
-        if(is_comment(buffer) == 1)
-            continue;
-        fflush(stdout);
-    
-        src = buffer;
-        while(src[0] != '\0'){
-            int index = copy_next_int(src, dst);
-            src += index;
-            dst += 4;
-            counter += 1;
+    for(int i = -1; i < 3; i++) {
+        c = fgetc(in);
+        if(c == EOF) {
+            fprintf(stderr, READ_PIXEL_ERROR);
+            return -1;
         }
-    }
-    free(buffer);
 
-    return pixels;
+        if(c == '\n') {
+            i--;
+            continue;
+        }
+
+        if(i == -1 && isnumber(c) == 1) {
+            str[0] = c;
+            i++;
+            continue;
+        }
+
+        str[i] = c;
+    }
+
+    char* end;
+    int v = (int) strtol(str, &end, 10);
+
+    if(v == 0 && (errno != 0 || str == end)) {
+        fprintf(stderr, READ_PIXEL_ERROR);
+        return -1;
+    }
+
+    return v;
 }
 
 /* lit une image ppm donnée en entrée standard 
 et fait pointer pw et ph respectivement sur la largeur w et la hauteur h.
 Renvoie un pointeur sur h pointeurs sur 3w entiers correspondant
 aux différents pixels de l’image dans l’ordre */
-int** read_ppm(int* pw, int* ph) {
+int** read_ppm(FILE* in, int* pw, int* ph) {
     int** pixels;
     char* buffer;
 
     /* "P3" */
-    buffer = read_line();
+    buffer = read_line(in);
+    if(buffer == NULL) {
+        return NULL;
+    }
     free(buffer);
 
     /* Width height */
-    buffer = read_line();
+    buffer = read_line(in);
+    if(buffer == NULL) {
+        return NULL;
+    }
     read_width_height(buffer, pw, ph);
+    free(buffer);
+
+    /* Max color value */
+    buffer = read_line(in);
+    if(buffer == NULL) {
+        return NULL;
+    }
     free(buffer);
 
     /* Pixels */
     pixels = (int**) malloc(sizeof(int*) * (*ph));
+    if(pixels == NULL) {
+        fprintf(stderr, MEMORY_ERROR);
+        return NULL;
+    }
+
     for(int i = 0; i < *ph; i++) {
-        buffer = read_pixels_line(*pw);
-        pixels[i] = read_pixels(buffer, *pw);
-    	free(buffer);
+        pixels[i] = (int*) malloc(sizeof(int) * (*pw) * 3);
+        if(pixels[i] == NULL) {
+            fprintf(stderr, MEMORY_ERROR);
+            return NULL;
+        }
+
+        for(int j = 0; j < *pw * 3; j++) {
+            pixels[i][j] = next_int_pixel(in);
+
+            if(pixels[i][j] < 0) {
+                return NULL;
+            }
+        }
     }
 
     return pixels;
@@ -191,7 +172,7 @@ float lin(float x) {
 
 /* Renvoie 0.2126 * lin(r / 255) + 0.7152 * lin(g / 255) + 0.0722 * lin(b / 255) */
 float mean(int r, int g, int b) {
-    return 0.2126 * lin(r / 255) + 0.7152 * lin(g / 255) + 0.0722 * lin(b / 255);
+    return 0.2126 * lin(((float) r) / 255) + 0.7152 * lin(((float) g) / 255) + 0.0722 * lin(((float) b) / 255);
 }
 
 /* Calcule m = mean(r, g, b)
@@ -209,9 +190,17 @@ float lum(int r, int g, int b) {
 aux différents pixels de l’image dans l’ordre transformés en gris */
 int** grayscale(int** pixels, int w, int h) {
     int** gray_pixels = (int**) malloc(sizeof(int*) * h);
+    if(gray_pixels == NULL) {
+        fprintf(stderr, MEMORY_ERROR);
+        return NULL;
+    }
 
     for(int i = 0; i < h; i++) {
         gray_pixels[i] = (int*) malloc(sizeof(int) * w);
+        if(gray_pixels[i] == NULL) {
+            fprintf(stderr, MEMORY_ERROR);
+            return NULL;
+        }
 
         for(int j = 0; j < w; j++) {
             int r = pixels[i][j * 3];
@@ -219,7 +208,7 @@ int** grayscale(int** pixels, int w, int h) {
             int b = pixels[i][j * 3 + 2];
 
             /* De base arrondi à l'inférieur */
-            gray_pixels[i][j] = (int) (255 * lum(r, g, b));
+            gray_pixels[i][j] = (int) (255.0 * lum(r, g, b));
         }
     }
 
@@ -249,18 +238,37 @@ Elle renvoie un pointeur sur haa pointeurs sur waa flottants correspondant
 aux intensités de chaque rectangle */
 float** get_intensities(int** graypixels, int w, int h, int waa, int haa) {
     float** intensities = (float**) malloc(sizeof(float*) * haa);
-    int rect_w = w / waa;
-    int rect_h = h / haa;
+    if(intensities == NULL) {
+        fprintf(stderr, MEMORY_ERROR);
+        return NULL;
+    }
+
+    int rest_w = w;
+    int rest_h = h;
+    int rect_x = 0;
+    int rect_y = 0;
 
     for(int i = 0; i < haa; i++) {
         intensities[i] = (float*) malloc(sizeof(float) * waa);
+        if(intensities[i] == NULL) {
+            fprintf(stderr, MEMORY_ERROR);
+            return NULL;
+        }
+
+        int rect_h = floorf(((float) rest_h) / ((float) (haa - i)));
+        rest_w = w;
+        rect_x = 0;
 
         for(int j = 0; j < waa; j++) {
-            int c = j * rect_w;
-            int l = i * rect_h;
+            int rect_w = floorf(((float) rest_w) / ((float) (waa - j)));
 
-            intensities[i][j] = get_intensity(graypixels, c, l, rect_w, rect_h);
+            intensities[i][j] = get_intensity(graypixels, rect_x, rect_y, rect_w, rect_h);
+            rest_w -= rect_w;
+            rect_x += rect_w;
         }
+
+        rest_h -= rect_h;
+        rect_y += rect_h;
     }
 
     return intensities;
@@ -270,16 +278,25 @@ float** get_intensities(int** graypixels, int w, int h, int waa, int haa) {
 char intensity_to_char(float intensity, char* chartable) {
     int charlen = strlen(chartable);
     float val = (1 - (intensity / 255)) * (float) (charlen - 1);
+    int i = (int) round(val);
 
-    return chartable[(int) round(val)];
+    return chartable[i];
 }
 
 /* Renvoie des listes de caratères des intensités converties */
 char** intensities_to_chars(float** intensities, char* chartableW, int waa, int haa) {
     char** chars = (char**) malloc(sizeof(char*) * haa);
+    if(chars == NULL) {
+        fprintf(stderr, MEMORY_ERROR);
+        return NULL;
+    }
 
     for(int i = 0; i < haa; i++) {
         chars[i] = (char*) malloc(sizeof(char) * waa);
+        if(chars[i] == NULL) {
+            fprintf(stderr, MEMORY_ERROR);
+            return NULL;
+        }
 
         for(int j = 0; j < waa; j++) {
             chars[i][j] = intensity_to_char(intensities[i][j], chartableW);
@@ -289,28 +306,156 @@ char** intensities_to_chars(float** intensities, char* chartableW, int waa, int 
     return chars;
 }
 
-int main(void) {
-    int w, h;
-    int haa = 500, waa = 500;
-    char* chartable = " .:-=+*#%@";
-    int** ppm = read_ppm(&w, &h);
-    /*int** gray_ppm = grayscale(ppm, w, h);
+void print_help(char* exec_name) {
+    printf("Usage: %s <PPM image> <options>\n", exec_name);
+    printf("/!\\ Warning: only PPM P3 images are allowed\n\n");
+
+    printf("Options :\n");
+    printf("-o <file>\tOutput file where the ASCII art is printed (default is stdout)\n");
+    printf("-mw <size>\tASCII art max width\n");
+    printf("-mh <size>\tASCII art max height\n");
+    printf("-bc\t\tUse a big ASCII char table (default)\n");
+    printf("-sc\t\tUse a small ASCII char table\n");
+}
+
+void print_arg_error(char* exec_name) {
+    fprintf(stderr, "Usage: %s <PPM image> <options>\n", exec_name);
+    fprintf(stderr, "Use %s -h for help\n", exec_name);
+}
+
+int args(int argc, char** argv, char** input, char** output, int* w, int* h, int* waa, int* haa, char** chartable) {
+    if(argc < 2) {
+        print_arg_error(argv[0]);
+        return 0;
+    }
+
+    if(strcmp(argv[1], "-h") == 0) {
+        print_help(argv[0]);
+        return 0;
+    }
+
+    char* str;
+    char* end;
+    *input = argv[1];
+    *output = NULL;
+    *waa = -1;
+    *haa = -1;
+    *chartable = BIG_CHAR_TABLE;
+
+    for(int i = 2; i < argc; i++) {
+        if(strcmp(argv[i], "-h") == 0) {
+            print_help(argv[0]);
+            return 0;
+        } else if(strcmp(argv[i], "-o") == 0) {
+            *output = argv[i + 1];
+            i++;
+        } else if(strcmp(argv[i], "-mw") == 0) {
+            char* str = argv[i + 1];
+            char* end;
+
+            *waa = strtol(str, &end, 10);
+            i++;
+
+            if(*waa == 0 && (errno != 0 || str == end)) {
+                fprintf(stderr, "Invalid size for -mw : %s\n", str);
+                return 0;
+            }
+        } else if(strcmp(argv[i], "-mh") == 0) {
+            char* str = argv[i + 1];
+            char* end;
+            
+            *haa = strtol(str, &end, 10);
+            i++;
+
+            if(*haa == 0 && (errno != 0 || str == end)) {
+                fprintf(stderr, "Invalid size for -mh : %s\n", str);
+                return 0;
+            }
+        } else if(strcmp(argv[i], "-bc") == 0) {
+            *chartable = BIG_CHAR_TABLE;
+        } else if(strcmp(argv[i], "-sc") == 0) {
+            *chartable = SMALL_CHAR_TABLE;
+        } else {
+            fprintf(stderr, "Unknwon argument %s\n", argv[i]);
+            print_arg_error(argv[0]);
+            return 0;
+        }
+    }
+
+    return 1;
+}
+
+int main(int argc, char** argv) {
+    int w, h, waa, haa;
+    char* in_file;
+    char* out_file;
+    char* chartable;
+    FILE* in;
+    FILE* out;
+    
+    if(!args(argc, argv, &in_file, &out_file, &w, &h, &waa, &haa, &chartable))
+        return EXIT_FAILURE;
+
+    in = fopen(in_file, "r");
+    if(in == NULL) {
+        fprintf(stderr, "Failed to open %s", in_file);
+        return EXIT_FAILURE;
+    }
+
+    int** ppm = read_ppm(in, &w, &h);
+    fclose(in);
+
+    if(ppm == NULL) {
+        return EXIT_FAILURE;
+    }
+
+    if(waa <= 0 || waa > w)
+        waa = w;
+    
+    if(haa <= 0 || haa > h)
+        haa = h;
+
+    int** gray_ppm = grayscale(ppm, w, h);
+    if(gray_ppm == NULL) {
+        return EXIT_FAILURE;
+    }
+
     float** intensities = get_intensities(gray_ppm, w, h, waa, haa);
+    if(intensities == NULL) {
+        return EXIT_FAILURE;
+    }
+
     char** chars = intensities_to_chars(intensities, chartable, waa, haa);
+    if(chars == NULL) {
+        return EXIT_FAILURE;
+    }
+
+    if (out_file != NULL) {
+        out = fopen(out_file, "w");
+        if(out == NULL) {
+            fprintf(stderr, "Failed to open %s", out_file);
+            return EXIT_FAILURE;
+        }
+    } else {
+        out = stdout;
+    }
 
     for(int i = 0; i < haa; i++) {
         for(int j = 0; j < waa; j++) {
-            printf("%c", chars[i][j]);
+            fprintf(out, "%c", chars[i][j]);
         }
 
-        printf("\n");
+        fprintf(out, "\n");
     }
-    printf("\n");
+    fprintf(out, "\n");
+
+    if(out_file != NULL)
+        fclose(out);
 
     free(ppm);
     free(gray_ppm);
     free(intensities);
-    free(chars);*/
+    free(chars);
 
     return EXIT_SUCCESS;
 }
