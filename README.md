@@ -25,6 +25,7 @@ gcc ascii_art.c -lm -o exec
 | -sc      | Use a small ASCII char table                                   |
 
 ## Examples
+![cats](examples/cats.jpeg)
 
 ```bash
 ./exec ./examples/cats.ppm -o output
