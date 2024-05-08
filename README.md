@@ -10,7 +10,7 @@ Useful tools:
 ## Usage
 
 ```bash
-gcc ascii_art.c -lm -o exec
+gcc -o exec ascii_art.c -lm
 ./exec <PPM image> <options>
 ```
 
