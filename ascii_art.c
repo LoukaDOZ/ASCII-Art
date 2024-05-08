@@ -314,8 +314,8 @@ void print_help(char* exec_name) {
     printf("-o <file>\tOutput file where the ASCII art is printed (default is stdout)\n");
     printf("-mw <size>\tASCII art max width\n");
     printf("-mh <size>\tASCII art max height\n");
-    printf("-bc\t\tUse a big ASCII char table (default)\n");
-    printf("-sc\t\tUse a small ASCII char table\n");
+    printf("-bc\t\tUse a big ASCII char table\n");
+    printf("-sc\t\tUse a small ASCII char table (default)\n");
 }
 
 void print_arg_error(char* exec_name) {
@@ -340,7 +340,7 @@ int args(int argc, char** argv, char** input, char** output, int* w, int* h, int
     *output = NULL;
     *waa = -1;
     *haa = -1;
-    *chartable = BIG_CHAR_TABLE;
+    *chartable = SMALL_CHAR_TABLE;
 
     for(int i = 2; i < argc; i++) {
         if(strcmp(argv[i], "-h") == 0) {
